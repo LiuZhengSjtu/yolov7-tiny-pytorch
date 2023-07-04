@@ -4,6 +4,7 @@ import torch
 from tqdm import tqdm
 
 from utils.utils import get_lr
+
         
 def fit_one_epoch(model_train, model, ema, yolo_loss, loss_history, eval_callback, optimizer, epoch, epoch_step, epoch_step_val, gen, gen_val, Epoch, cuda, fp16, scaler, save_period, save_dir, local_rank=0):
     loss        = 0
@@ -13,6 +14,10 @@ def fit_one_epoch(model_train, model, ema, yolo_loss, loss_history, eval_callbac
         print('Start Train')
         pbar = tqdm(total=epoch_step,desc=f'Epoch {epoch + 1}/{Epoch}',postfix=dict,mininterval=0.3)
     model_train.train()
+    
+
+    
+    #   code goes into utils->dataloader->YoloDataset->__getitem__ to fetch images and labels
     for iteration, batch in enumerate(gen):
         if iteration >= epoch_step:
             break

@@ -121,17 +121,21 @@ def myTrain():
 # class TransfomrsImage():
 #     def __init__(self):
 #
-class ImageLoad():
-    def __init__(self,path = './nyu_hand_dataset_rdf/dataset_rdf/dataset/'):
 
-        self.train_rate = 0.7
+
+class ImageLoad():
+    def __init__(self,path = 'D:/pythonProject/hand_detection_depth/nyu_hand_dataset_rdf/dataset_rdf/dataset/'):
+
+        self.train_rate = 0.01
         self.test_rate = 0.15
-        self.imageread = 0
+        self.trainread = 0
+        self.testread = 0
         self.resizelen = 800
         self.filepath = path
         self.imglist0 = glob.glob(self.filepath + '*.png')
         self.listlen = len(self.imglist0)
         self.randomimg()
+        self.trainmode = True        #   false for test
 
         self.TransformsImags = transforms.Compose([
             transforms.RandomHorizontalFlip(p=0.5),
@@ -145,23 +149,32 @@ class ImageLoad():
         random.shuffle(self.imglist)
         
         self.imglist_train = self.imglist[0:int(self.train_rate * self.listlen)]
-        self.imglist_test = self.imglist[int(self.train_rate * self.listlen):int((self.test_rate + self.test_rate) * self.listlen)]
-        self.imglist_eval = self.imglist[int((self.test_rate + self.test_rate) * self.listlen):]
-    
-    def getimage(self,Aug=True,Show=False,Imgnum = None):
-        outimgpath = self.imglist_train[self.imageread]
-        if Imgnum ==0:
+        self.imglist_test = self.imglist[int(self.train_rate * self.listlen):int((self.train_rate + self.test_rate) * self.listlen)]
+        self.imglist_eval = self.imglist[int((self.train_rate + self.test_rate) * self.listlen):]
+        self.trainlistlen = len(self.imglist_train)
+        self.testlistlen = len(self.imglist_test)
+        self.evallistlen = len(self.imglist_eval)
+        
+    def getimage(self,Aug=True,Show=False,Imgnum = None,Mode=True):
+        if Mode:
+            outimgpath = self.imglist_train[self.trainread]
+            self.trainread += 1
+            if self.trainread >= self.trainlistlen:
+                self.trainread = 0
+        else:
+            outimgpath = self.imglist_test[self.testread]
+            self.testread += 1
+            if self.testread >= self.testlistlen:
+                self.testread = 0
+
+        if Imgnum == 0:
             outimgpath = './nyu_hand_dataset_rdf/dataset_rdf/dataset\\depth_0002054.png'
         elif Imgnum == 1:
             outimgpath = './nyu_hand_dataset_rdf/dataset_rdf/dataset\\depth_0002934.png'
         elif Imgnum == 2:
             outimgpath = './nyu_hand_dataset_rdf/dataset_rdf/dataset\\depth_0005228.png'
             
-        self.imageread += 1
-        if self.imageread == self.listlen:
-            #   if all pics have been chosen, rebuild the list randomly
-            self.randomimg()
-            self.imageread = 0
+            
 
         img0 = Image.open(outimgpath)
         
@@ -222,7 +235,7 @@ class ImageLoad():
             
         cv2.imshow('image lable area', img_lab)
         cv2.waitKey(0)
-        print(img_lab.shape)
+        # print(img_lab.shape)
 
     def transforms(self,x):
         '''
@@ -253,17 +266,26 @@ class ImageLoad():
         out = np.zeros((2,7),dtype=np.uint32)                       #   at most, two hands are detected
         if areanum > 0 :
             for prop in properties:
-                if (prop.area > 10):
-                    out[prop.label-1][0] = prop.area                #   area of each connected area
-                    out[prop.label-1][1] = int(prop.centroid[0])     #   pixel distance to top
-                    out[prop.label-1][2] = int(prop.centroid[1])     #   pixel distance to left
-                    out[prop.label-1][3] = np.min(prop.coords[:,0])
-                    out[prop.label - 1][4] = np.min(prop.coords[:,1])
-                    out[prop.label - 1][5] = np.max(prop.coords[:, 0])
-                    out[prop.label - 1][6] = np.max(prop.coords[:, 1])
+                if (prop.area > 10) :
+                    if prop.area > out[0][0]:
+                        out[1] = out[0]
+                        rownum = 0
+                    elif prop.area > out[1][0]:
+                        rownum = 1
+                    else:
+                        continue
+                        
+                    out[rownum] = np.array([prop.area , int(prop.centroid[0]) , int(prop.centroid[1]), np.min(prop.coords[:,0]), np.min(prop.coords[:,1]), np.max(prop.coords[:, 0]) ,np.max(prop.coords[:, 1])])
+                        # out[0][0] = prop.area                #   area of each connected area
+                        # out[0][1] = int(prop.centroid[0])     #   pixel distance to top
+                        # out[0][2] = int(prop.centroid[1])     #   pixel distance to left
+                        # out[0][3] = np.min(prop.coords[:,0])
+                        # out[0][4] = np.min(prop.coords[:,1])
+                        # out[0][5] = np.max(prop.coords[:, 0])
+                        # out[0][6] = np.max(prop.coords[:, 1])
         return out
     
-    def imgcrop(self,len=384):
+    def imgcrop(self,len=416):
         span = self.resizelen - len
         croplt = (span * np.random.rand(2)).astype(np.int32)
         self.image_depth_crop = self.image_depth[croplt[0]:croplt[0] + len, croplt[1]:croplt[1] + len]
@@ -273,17 +295,20 @@ class ImageLoad():
         for i in range(2):
             if self.arr_label_crop[i][3] == self.arr_label_crop[i][5] or self.arr_label_crop[i][4] == self.arr_label_crop[i][6]:
                 self.arr_label_crop[i][0] = 0
-        print(self.arr_label_crop.shape)
+        # print(self.arr_label_crop.shape)
                 
         # return self.image_depth_crop, self.image_label_crop
         
+imghandle = ImageLoad()
+haha=0
 
 
-if __name__=='__main__':
-    # imglist_train, imglist_test, imglist_eval = datalist()
-    # img_depth, img_label = loaddata(imglist_train[0])
-    # img_depth, img_label = loaddata('./nyu_hand_dataset_rdf/dataset_rdf/dataset\\depth_0003342.png')
-    imghandle = ImageLoad()
-    for i in range(4):
-        depth, label = imghandle.getimage(Aug=True,Show=True,Imgnum=2)
-    myTrain()
+#
+# if __name__=='__main__':
+#     # imglist_train, imglist_test, imglist_eval = datalist()
+#     # img_depth, img_label = loaddata(imglist_train[0])
+#     # img_depth, img_label = loaddata('./nyu_hand_dataset_rdf/dataset_rdf/dataset\\depth_0003342.png')
+#     imghandle = ImageLoad()
+#     for i in range(4):
+#         depth, label = imghandle.getimage(Aug=True,Show=True,Imgnum=2)
+#     myTrain()

@@ -20,6 +20,7 @@ from utils.dataloader import YoloDataset, yolo_dataset_collate
 from utils.utils import download_weights, get_anchors, get_classes, show_config
 from utils.utils_fit import fit_one_epoch
 
+from utils.getimg import imghandle
 '''
 训练自己的目标检测模型一定需要注意以下几点：
 1、训练前仔细检查自己的格式是否满足要求，该库要求数据集格式为VOC格式，需要准备好的内容有输入图片和标签
@@ -67,7 +68,7 @@ if __name__ == "__main__":
     #   classes_path    指向model_data下的txt，与自己训练的数据集相关 
     #                   训练前一定要修改classes_path，使其对应自己的数据集
     #---------------------------------------------------------------------#
-    classes_path    = 'model_data/voc_classes.txt'
+    classes_path    = 'model_data/hand_class.txt'
     #---------------------------------------------------------------------#
     #   anchors_path    代表先验框对应的txt文件，一般不修改。
     #   anchors_mask    用于帮助代码找到对应的先验框，一般不修改。
@@ -93,11 +94,11 @@ if __name__ == "__main__":
     #      可以设置mosaic=True，直接随机初始化参数开始训练，但得到的效果仍然不如有预训练的情况。（像COCO这样的大数据集可以这样做）
     #   2、了解imagenet数据集，首先训练分类模型，获得网络的主干部分权值，分类模型的 主干部分 和该模型通用，基于此进行训练。
     #----------------------------------------------------------------------------------------------------------------------------#
-    model_path      = 'logs/last_epoch_weights.pth' #'model_data/yolov7_tiny_weights.pth'
+    model_path      = 'model_data/yolov7_tiny_weights.pth'#   'logs/last_epoch_weights.pth' #
     #------------------------------------------------------#
     #   input_shape     输入的shape大小，一定要是32的倍数
     #------------------------------------------------------#
-    input_shape     = [640, 640]
+    input_shape     = [416, 416]
     #----------------------------------------------------------------------------------------------------------------------------#
     #   pretrained      是否使用主干网络的预训练权重，此处使用的是主干的权重，因此是在模型构建的时候进行加载的。
     #                   如果设置了model_path，则主干的权值无需加载，pretrained的值无意义。
@@ -162,7 +163,7 @@ if __name__ == "__main__":
     #   Freeze_batch_size   模型冻结训练的batch_size
     #                       (当Freeze_Train=False时失效)
     #------------------------------------------------------------------#
-    Init_Epoch          = 4
+    Init_Epoch          = 0
     Freeze_Epoch        = 50
     Freeze_batch_size   = 2
     #------------------------------------------------------------------#
@@ -365,6 +366,12 @@ if __name__ == "__main__":
         train_lines = f.readlines()
     with open(val_annotation_path, encoding='utf-8') as f:
         val_lines   = f.readlines()
+    
+    imghandle.randomimg()
+    train_lines = imghandle.imglist_train
+    val_lines = imghandle.imglist_test
+    
+    
     num_train   = len(train_lines)
     num_val     = len(val_lines)
 
@@ -461,9 +468,9 @@ if __name__ == "__main__":
         #   构建数据集加载器。
         #---------------------------------------#
         train_dataset   = YoloDataset(train_lines, input_shape, num_classes, anchors, anchors_mask, epoch_length=UnFreeze_Epoch, \
-                                        mosaic=mosaic, mixup=mixup, mosaic_prob=mosaic_prob, mixup_prob=mixup_prob, train=True, special_aug_ratio=special_aug_ratio)
+                                        mosaic=mosaic, mixup=mixup, mosaic_prob=mosaic_prob, mixup_prob=mixup_prob, train=True, special_aug_ratio=special_aug_ratio,imghandle=imghandle)
         val_dataset     = YoloDataset(val_lines, input_shape, num_classes, anchors, anchors_mask, epoch_length=UnFreeze_Epoch, \
-                                        mosaic=False, mixup=False, mosaic_prob=0, mixup_prob=0, train=False, special_aug_ratio=0)
+                                        mosaic=False, mixup=False, mosaic_prob=0, mixup_prob=0, train=False, special_aug_ratio=0,imghandle=imghandle)
         
         if distributed:
             train_sampler   = torch.utils.data.distributed.DistributedSampler(train_dataset, shuffle=True,)
@@ -473,7 +480,7 @@ if __name__ == "__main__":
         else:
             train_sampler   = None
             val_sampler     = None
-            shuffle         = True
+            shuffle         = False
 
         gen             = DataLoader(train_dataset, shuffle = shuffle, batch_size = batch_size, num_workers = num_workers, pin_memory=True,
                                     drop_last=True, collate_fn=yolo_dataset_collate, sampler=train_sampler)

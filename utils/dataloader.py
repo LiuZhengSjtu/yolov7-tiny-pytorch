@@ -11,7 +11,7 @@ from utils.utils import cvtColor, preprocess_input
 
 class YoloDataset(Dataset):
     def __init__(self, annotation_lines, input_shape, num_classes, anchors, anchors_mask, epoch_length, \
-                        mosaic, mixup, mosaic_prob, mixup_prob, train, special_aug_ratio = 0.7):
+                        mosaic, mixup, mosaic_prob, mixup_prob, train, special_aug_ratio = 0.7,imghandle = []):
         super(YoloDataset, self).__init__()
         self.annotation_lines   = annotation_lines
         self.input_shape        = input_shape
@@ -30,6 +30,7 @@ class YoloDataset(Dataset):
         self.length             = len(self.annotation_lines)
         
         self.bbox_attrs         = 5 + num_classes
+        self.imghandle          = imghandle
 
     def __len__(self):
         return self.length
@@ -54,8 +55,22 @@ class YoloDataset(Dataset):
         else:
             image, box      = self.get_random_data(self.annotation_lines[index], self.input_shape, random = self.train)
 
-        image       = np.transpose(preprocess_input(np.array(image, dtype=np.float32)), (2, 0, 1))
-        box         = np.array(box, dtype=np.float32)
+        depth_img, lable_arr = self.imghandle.getimage(Mode=self.train)
+        depth_img3 = np.array([depth_img, depth_img, depth_img],dtype=np.float32)
+        
+        image_ = depth_img3
+        
+        #   turn from (totop, toleft) to (toleft, totop)
+        boxarr = np.array([lable_arr[:,4],lable_arr[:,3],lable_arr[:,6],lable_arr[:,5],lable_arr[:,0]],dtype=np.float32).T
+        boxarr[:, -1] = boxarr[:, -1] > 0
+        box_ = boxarr
+        
+        if True:
+            image = image_
+            box = box_
+        else:
+            image       = np.transpose(preprocess_input(np.array(image, dtype=np.float32)), (2, 0, 1))
+            box         = np.array(box, dtype=np.float32)
         
         #---------------------------------------------------#
         #   对真实框进行预处理
@@ -80,7 +95,7 @@ class YoloDataset(Dataset):
             #   调整顺序，符合训练的格式
             #   labels_out中序号为0的部分在collect时处理
             #---------------------------------------------------#
-            labels_out[:, 1] = box[:, -1]
+            labels_out[:, 1]  = box[:, -1]
             labels_out[:, 2:] = box[:, :4]
             
         return image, labels_out
