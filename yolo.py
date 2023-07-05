@@ -13,6 +13,10 @@ from utils.utils import (cvtColor, get_anchors, get_classes, preprocess_input,
                          resize_image, show_config)
 from utils.utils_bbox import DecodeBox, DecodeBoxNP
 
+
+from utils.getimg import imghandle
+
+
 '''
 训练自己的数据集必看注释！
 '''
@@ -27,8 +31,8 @@ class YOLO(object):
         #   如果出现shape不匹配，同时要注意训练时的model_path和classes_path参数的修改
         #--------------------------------------------------------------------------#
         #"model_path"        : 'model_data/yolov7_tiny_weights.pth',
-        "model_path"         : 'logs/ep010-loss0.078-val_loss0.064.pth',
-        "classes_path"      : 'model_data/voc_classes.txt',
+        "model_path"         : 'logs/ep300-loss0.026-val_loss0.027.pth',
+        "classes_path"      : 'model_data/hand_class.txt',
         #---------------------------------------------------------------------#
         #   anchors_path代表先验框对应的txt文件，一般不修改。
         #   anchors_mask用于帮助代码找到对应的先验框，一般不修改。
@@ -38,7 +42,7 @@ class YOLO(object):
         #---------------------------------------------------------------------#
         #   输入图片的大小，必须为32的倍数。
         #---------------------------------------------------------------------#
-        "input_shape"       : [640, 640],
+        "input_shape"       : [416,416],
         #---------------------------------------------------------------------#
         #   只有得分大于置信度的预测框会被保留下来
         #---------------------------------------------------------------------#
@@ -56,7 +60,7 @@ class YOLO(object):
         #   是否使用Cuda
         #   没有GPU可以设置成False
         #-------------------------------#
-        "cuda"              : False,
+        "cuda"              : True,
     }
 
     @classmethod
@@ -91,6 +95,10 @@ class YOLO(object):
         self.generate()
 
         show_config(**self._defaults)
+
+#   added by liuzheng
+        self.imghandle = imghandle
+        self.imghandle.randomimg()
 
     #---------------------------------------------------#
     #   生成模型
@@ -132,6 +140,28 @@ class YOLO(object):
         #---------------------------------------------------------#
         image_data  = np.expand_dims(np.transpose(preprocess_input(np.array(image_data, dtype='float32')), (2, 0, 1)), 0)
 
+#   added by liuzheng
+        
+        depth_img, label_arr = self.imghandle.getimage(Predict=True)
+        image_shape = np.array(np.shape(depth_img)[0:2])
+        depth_img3 = np.array([depth_img, depth_img, depth_img],dtype=np.float32)
+        # image = Image.fromarray(depth_img3, 'RGB')
+        image = Image.fromarray(np.transpose((255.0 * depth_img3/np.max(depth_img3)),(1,2,0)),'RGB')
+        # torch.unsqueeze(torch.Tensor(depth_img3),0)
+        image_data = np.expand_dims(depth_img3,0)
+
+
+        depth_img255 = (depth_img / np.max(depth_img) * 255).astype('uint8')
+        
+        for i in range(label_arr.shape[0]):
+            if label_arr[i][0]> 0:
+                print('---- label {}: {} ----'.format(i,label_arr[i]) )
+                # cv2.circle(depth_img255,(label_arr[i][2],label_arr[i][1]),radius=5,thickness=i*2-1,color=(255, 0, 0))
+                cv2.rectangle(depth_img255,(label_arr[i][4],label_arr[i][3]),(label_arr[i][6],label_arr[i][5]),color=(128, 0, 0),thickness=3*i+3)
+        # cv2.imshow('sss',depth_img255)
+        # cv2.waitKey(0)
+#   --------------------
+
         with torch.no_grad():
             images = torch.from_numpy(image_data)
             if self.cuda:
@@ -148,7 +178,8 @@ class YOLO(object):
                         image_shape, self.letterbox_image, conf_thres = self.confidence, nms_thres = self.nms_iou)
                                                     
             if results[0] is None: 
-                return image
+                print('No hand found !!!')
+                return None
 
             top_label   = np.array(results[0][:, 6], dtype = 'int32')
             top_conf    = results[0][:, 4] * results[0][:, 5]
@@ -156,8 +187,8 @@ class YOLO(object):
         #---------------------------------------------------------#
         #   设置字体与边框厚度
         #---------------------------------------------------------#
-        font        = ImageFont.truetype(font='model_data/simhei.ttf', size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
-        thickness   = int(max((image.size[0] + image.size[1]) // np.mean(self.input_shape), 1))
+        font        = ImageFont.truetype(font='model_data/simhei.ttf', size=np.floor(3e-2 * depth_img255.shape[1] + 0.5).astype('int32'))
+        thickness   = int(max((depth_img255.shape[0] + depth_img255.shape[1]) // np.mean(self.input_shape), 1))
         #---------------------------------------------------------#
         #   计数
         #---------------------------------------------------------#
@@ -178,8 +209,8 @@ class YOLO(object):
                 top, left, bottom, right = top_boxes[i]
                 top     = max(0, np.floor(top).astype('int32'))
                 left    = max(0, np.floor(left).astype('int32'))
-                bottom  = min(image.size[1], np.floor(bottom).astype('int32'))
-                right   = min(image.size[0], np.floor(right).astype('int32'))
+                bottom  = min(depth_img255.shape[1], np.floor(bottom).astype('int32'))
+                right   = min(depth_img255.shape[0], np.floor(right).astype('int32'))
                 
                 dir_save_path = "img_crop"
                 if not os.path.exists(dir_save_path):
@@ -199,14 +230,14 @@ class YOLO(object):
 
             top     = max(0, np.floor(top).astype('int32'))
             left    = max(0, np.floor(left).astype('int32'))
-            bottom  = min(image.size[1], np.floor(bottom).astype('int32'))
-            right   = min(image.size[0], np.floor(right).astype('int32'))
+            bottom  = min(depth_img255.shape[1], np.floor(bottom).astype('int32'))
+            right   = min(depth_img255.shape[0], np.floor(right).astype('int32'))
 
             label = '{} {:.2f}'.format(predicted_class, score)
             draw = ImageDraw.Draw(image)
             label_size = draw.textsize(label, font)
             label = label.encode('utf-8')
-            print(label, top, left, bottom, right)
+            print('**** raw prediction: {}. class & conf {}, top {}, left {} bottom {}, right {} ****'.format( i,label, top, left, bottom, right))
             
             if top - label_size[1] >= 0:
                 text_origin = np.array([left, top - label_size[1]])
@@ -219,7 +250,25 @@ class YOLO(object):
             draw.text(text_origin, str(label,'UTF-8'), fill=(0, 0, 0), font=font)
             del draw
 
-        return image
+#       add by liuzheng
+        resultsclip = np.array(results[0],dtype=np.float32)
+        resultsclip = np.clip(resultsclip,0,depth_img255.shape[0]-1)
+        for i in range(resultsclip.shape[0]):
+            # cv2.circle(depth_img255,(label_arr[i][2],label_arr[i][1]),radius=5,thickness=i*2-1,color=(255, 0, 0))
+            cv2.rectangle(depth_img255,(resultsclip[i][1],resultsclip[i][0]),(resultsclip[i][3],resultsclip[i][2]),(1, 0, 128),thickness=1)
+
+
+          
+        
+        # print('predict boxes (1. left top point to image top edge, left top point to image left edge, right botton point to image top, right botton point to image left edge. 2....):')
+        print('*-*- predict results' , top_boxes, '*--*')
+        print('*-*- cooresponding confidence ',top_conf, '*--*')
+        print('------------------ end -------------------------')
+
+        cv2.imshow('depth image',depth_img255)  
+        cv2.waitKey(0)
+#       ------------------
+        return [top_boxes, top_conf]
 
     def get_FPS(self, image, test_interval):
         image_shape = np.array(np.shape(image)[0:2])

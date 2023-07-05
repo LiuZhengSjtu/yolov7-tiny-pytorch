@@ -86,7 +86,8 @@ if __name__ == "__main__":
         比如判断if predicted_class == 'car': 即可判断当前目标是否为车，然后记录数量即可。利用draw.text即可写字。
         '''
         while True:
-            img = input('Input image filename:')
+            # img = input('Input image filename:')
+            img = 'img/street.jpg'
             try:
                 image = Image.open(img)
             except:
@@ -94,7 +95,8 @@ if __name__ == "__main__":
                 continue
             else:
                 r_image = yolo.detect_image(image, crop = crop, count=count)
-                r_image.show()
+                c = r_image
+                # r_image.show('sample')
 
     elif mode == "video":
         capture = cv2.VideoCapture(video_path)

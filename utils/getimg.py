@@ -124,12 +124,13 @@ def myTrain():
 
 
 class ImageLoad():
-    def __init__(self,path = 'D:/pythonProject/hand_detection_depth/nyu_hand_dataset_rdf/dataset_rdf/dataset/'):
-
-        self.train_rate = 0.01
-        self.test_rate = 0.15
+    def __init__(self,path = '/homeL/zheng/PycharmProjects/yolov7-tiny-pytorch/nyu_hand_dataset_rdf/dataset_rdf/dataset/'):
+                #   /homeL/zheng/PycharmProjects/yolov7-tiny-pytorch/nyu_hand_dataset_rdf/dataset_rdf/dataset/
+        self.train_rate = 0.8
+        self.test_rate = 0.1
         self.trainread = 0
         self.testread = 0
+        self.evalread = 0
         self.resizelen = 800
         self.filepath = path
         self.imglist0 = glob.glob(self.filepath + '*.png')
@@ -155,17 +156,25 @@ class ImageLoad():
         self.testlistlen = len(self.imglist_test)
         self.evallistlen = len(self.imglist_eval)
         
-    def getimage(self,Aug=True,Show=False,Imgnum = None,Mode=True):
-        if Mode:
-            outimgpath = self.imglist_train[self.trainread]
-            self.trainread += 1
-            if self.trainread >= self.trainlistlen:
-                self.trainread = 0
+    def getimage(self,Aug=True,Show=False,Imgnum = None,Mode=True,Predict=False):
+        if Predict:
+            outimgpath = self.imglist_eval[self.evalread]
+            self.evalread += 1
+            if self.evalread >= self.evallistlen:
+                self.evalread = 0
+            # outimgpath = '/homeL/zheng/PycharmProjects/yolov7-tiny-pytorch/nyu_hand_dataset_rdf/dataset_rdf/dataset/depth_0002054.png'      #   no hand
+            # print(outimgpath)
         else:
-            outimgpath = self.imglist_test[self.testread]
-            self.testread += 1
-            if self.testread >= self.testlistlen:
-                self.testread = 0
+            if Mode:
+                outimgpath = self.imglist_train[self.trainread]
+                self.trainread += 1
+                if self.trainread >= self.trainlistlen:
+                    self.trainread = 0
+            else:
+                outimgpath = self.imglist_test[self.testread]
+                self.testread += 1
+                if self.testread >= self.testlistlen:
+                    self.testread = 0
 
         if Imgnum == 0:
             outimgpath = './nyu_hand_dataset_rdf/dataset_rdf/dataset\\depth_0002054.png'
@@ -180,14 +189,15 @@ class ImageLoad():
         
         self.origin_h = img0.height
         self.origin_w = img0.width
-        return self.Aug(img0,Aug,Show)
+        return self.Aug(img0,Aug,Show,Predict=Predict)
         
-    def Aug(self,img0, aug=True,Show=False):
+    def Aug(self,img0, aug=True,Show=False,Predict=False):
         img0_res = np.asarray(img0)
         fillc = img0_res[0, 0, 2] + img0_res[0, 0, 1] * 256  # fill background by original image background
         self.imgdepth = []
         self.imglabel = []
-        if aug == True:
+
+        if aug == True and (not Predict):
             img_aug = self.transforms(img0)
             #   divide to each channel, split to depth image and label
             img_res = np.asarray(img_aug)
@@ -199,7 +209,7 @@ class ImageLoad():
             self.imgdepth = img0_res[:, :, 2] + img0_res[:, :, 1] * 256
             self.imglabel = img0_res[:, :, 0]
         
-        self.image_depth = self.imgdepth                     #   800*800
+        self.image_depth = self.imgdepth                     #   800*800 for train and test, in eval it depends on practical img size
         self.image_label = self.imglabel                    #   800*800
         self.arr_label = self.getconnectarea()            #   2*7
         
@@ -286,7 +296,7 @@ class ImageLoad():
         return out
     
     def imgcrop(self,len=416):
-        span = self.resizelen - len
+        span =np.array(self.image_depth.shape)  - len
         croplt = (span * np.random.rand(2)).astype(np.int32)
         self.image_depth_crop = self.image_depth[croplt[0]:croplt[0] + len, croplt[1]:croplt[1] + len]
         self.image_label_crop = self.image_label[croplt[0]:croplt[0] + len, croplt[1]:croplt[1] + len]

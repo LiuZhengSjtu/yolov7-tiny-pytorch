@@ -1,5 +1,5 @@
 import os
-
+import numpy as np
 import torch
 from tqdm import tqdm
 
@@ -36,7 +36,15 @@ def fit_one_epoch(model_train, model, ema, yolo_loss, loss_history, eval_callbac
             #   前向传播
             #----------------------#
             outputs         = model_train(images)
-            loss_value      = yolo_loss(outputs, targets, images)
+            # targets = torch.tensor([item.cpu().detach().numpy() for item in targets]).cuda()
+            # outputs = torch.tensor([item.cpu().detach().numpy() for item in outputs]).cuda()
+            anchors_mask = [[6,7,8], [3,4,5], [0,1,2]]
+            # for i in range(len(outputs)):
+            #     bs, _, h, w = outputs[i].size()
+            #     outputs[i] = outputs[i].view(bs, len(anchors_mask[i]), -1, h, w).permute(0, 1, 3, 4, 2).contiguous()
+
+
+            loss_value      = yolo_loss(outputs , targets, np.array(images.cpu(),dtype=np.uint16))
 
             #----------------------#
             #   反向传播
