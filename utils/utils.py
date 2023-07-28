@@ -1,6 +1,7 @@
 import numpy as np
 from PIL import Image
-
+import  sys
+sysp = sys.path
 
 #---------------------------------------------------------#
 #   将图像转换成RGB图像，防止灰度图在预测时报错。
@@ -35,6 +36,7 @@ def resize_image(image, size, letterbox_image):
 #   获得类
 #---------------------------------------------------#
 def get_classes(classes_path):
+    
     with open(classes_path, encoding='utf-8') as f:
         class_names = f.readlines()
     class_names = [c.strip() for c in class_names]

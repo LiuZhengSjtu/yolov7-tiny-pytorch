@@ -20,7 +20,7 @@ from utils.dataloader import YoloDataset, yolo_dataset_collate
 from utils.utils import download_weights, get_anchors, get_classes, show_config
 from utils.utils_fit import fit_one_epoch
 
-from utils.getimg import imghandle
+from utils.getimg import imghandle          #  !!! import the NYU dataset to replace original VOC dataset.
 '''
 训练自己的目标检测模型一定需要注意以下几点：
 1、训练前仔细检查自己的格式是否满足要求，该库要求数据集格式为VOC格式，需要准备好的内容有输入图片和标签
@@ -367,6 +367,8 @@ if __name__ == "__main__":
     with open(val_annotation_path, encoding='utf-8') as f:
         val_lines   = f.readlines()
     
+
+    #   re-determine the train and validation lines
     imghandle.randomimg()
     train_lines = imghandle.imglist_train
     val_lines = imghandle.imglist_test
@@ -467,6 +469,10 @@ if __name__ == "__main__":
         #---------------------------------------#
         #   构建数据集加载器。
         #---------------------------------------#
+
+
+        #  !!! ******************  the last input parameter of YoloDataset is the self-determined data source ***********************************
+
         train_dataset   = YoloDataset(train_lines, input_shape, num_classes, anchors, anchors_mask, epoch_length=UnFreeze_Epoch, \
                                         mosaic=mosaic, mixup=mixup, mosaic_prob=mosaic_prob, mixup_prob=mixup_prob, train=True, special_aug_ratio=special_aug_ratio,imghandle=imghandle)
         val_dataset     = YoloDataset(val_lines, input_shape, num_classes, anchors, anchors_mask, epoch_length=UnFreeze_Epoch, \

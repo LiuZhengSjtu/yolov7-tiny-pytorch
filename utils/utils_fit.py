@@ -17,7 +17,7 @@ def fit_one_epoch(model_train, model, ema, yolo_loss, loss_history, eval_callbac
     
 
     
-    #   code goes into utils->dataloader->YoloDataset->__getitem__ to fetch images and labels
+    #   code goes into utils->dataloader->YoloDataset->__getitem__ to fetch images and labels *************************
     for iteration, batch in enumerate(gen):
         if iteration >= epoch_step:
             break

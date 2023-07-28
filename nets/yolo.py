@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from nets.backbone import Backbone, Multi_Concat_Block, Conv
+from yolov7_tiny_pytorch.nets.backbone import Backbone, Multi_Concat_Block, Conv
 
 
 class SPPCSPC(nn.Module):

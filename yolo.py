@@ -8,14 +8,15 @@ import torch.nn as nn
 import cv2
 from PIL import ImageDraw, ImageFont, Image
 
-from nets.yolo import YoloBody
-from utils.utils import (cvtColor, get_anchors, get_classes, preprocess_input,
+from yolov7_tiny_pytorch.nets.yolo import YoloBody
+from yolov7_tiny_pytorch.utils.utils import (cvtColor, get_anchors, get_classes, preprocess_input,
                          resize_image, show_config)
-from utils.utils_bbox import DecodeBox, DecodeBoxNP
+from yolov7_tiny_pytorch.utils.utils_bbox import DecodeBox, DecodeBoxNP
 
 
-from utils.getimg import imghandle
-
+from yolov7_tiny_pytorch.utils.getimg import imghandle
+import  sys
+sysp = sys.path
 
 '''
 训练自己的数据集必看注释！
@@ -31,13 +32,13 @@ class YOLO(object):
         #   如果出现shape不匹配，同时要注意训练时的model_path和classes_path参数的修改
         #--------------------------------------------------------------------------#
         #"model_path"        : 'model_data/yolov7_tiny_weights.pth',
-        "model_path"         : 'logs/ep300-loss0.026-val_loss0.027.pth',
-        "classes_path"      : 'model_data/hand_class.txt',
+        "model_path"         : sysp[0] + '/' + 'yolov7_tiny_pytorch/logs/ep300-loss0.026-val_loss0.027.pth',
+        "classes_path"      : sysp[0] + '/' + 'yolov7_tiny_pytorch/model_data/hand_class.txt',
         #---------------------------------------------------------------------#
         #   anchors_path代表先验框对应的txt文件，一般不修改。
         #   anchors_mask用于帮助代码找到对应的先验框，一般不修改。
         #---------------------------------------------------------------------#
-        "anchors_path"      : 'model_data/yolo_anchors.txt',
+        "anchors_path"      : sysp[0] + '/' + 'yolov7_tiny_pytorch/model_data/yolo_anchors.txt',
         "anchors_mask"      : [[6, 7, 8], [3, 4, 5], [0, 1, 2]],
         #---------------------------------------------------------------------#
         #   输入图片的大小，必须为32的倍数。
@@ -96,9 +97,10 @@ class YOLO(object):
 
         show_config(**self._defaults)
 
-#   added by liuzheng
+#   added by liuzheng ****************************************************  !!!
         self.imghandle = imghandle
         self.imghandle.randomimg()
+        self.savecnt = 0
 
     #---------------------------------------------------#
     #   生成模型
@@ -120,28 +122,28 @@ class YOLO(object):
     #---------------------------------------------------#
     #   检测图片
     #---------------------------------------------------#
-    def detect_image(self, image, crop = False, count = False):
-        #---------------------------------------------------#
-        #   计算输入图片的高和宽
-        #---------------------------------------------------#
-        image_shape = np.array(np.shape(image)[0:2])
-        #---------------------------------------------------------#
-        #   在这里将图像转换成RGB图像，防止灰度图在预测时报错。
-        #   代码仅仅支持RGB图像的预测，所有其它类型的图像都会转化成RGB
-        #---------------------------------------------------------#
-        image       = cvtColor(image)
-        #---------------------------------------------------------#
-        #   给图像增加灰条，实现不失真的resize
-        #   也可以直接resize进行识别
-        #---------------------------------------------------------#
-        image_data  = resize_image(image, (self.input_shape[1], self.input_shape[0]), self.letterbox_image)
-        #---------------------------------------------------------#
-        #   添加上batch_size维度
-        #---------------------------------------------------------#
-        image_data  = np.expand_dims(np.transpose(preprocess_input(np.array(image_data, dtype='float32')), (2, 0, 1)), 0)
+    def detect_image(self, crop = False, count = False):
+        # #---------------------------------------------------#
+        # #   计算输入图片的高和宽
+        # #---------------------------------------------------#
+        # image_shape = np.array(np.shape(image)[0:2])
+        # #---------------------------------------------------------#
+        # #   在这里将图像转换成RGB图像，防止灰度图在预测时报错。
+        # #   代码仅仅支持RGB图像的预测，所有其它类型的图像都会转化成RGB
+        # #---------------------------------------------------------#
+        # image       = cvtColor(image)
+        # #---------------------------------------------------------#
+        # #   给图像增加灰条，实现不失真的resize
+        # #   也可以直接resize进行识别
+        # #---------------------------------------------------------#
+        # image_data  = resize_image(image, (self.input_shape[1], self.input_shape[0]), self.letterbox_image)
+        # #---------------------------------------------------------#
+        # #   添加上batch_size维度
+        # #---------------------------------------------------------#
+        # image_data  = np.expand_dims(np.transpose(preprocess_input(np.array(image_data, dtype='float32')), (2, 0, 1)), 0)
 
-#   added by liuzheng
-        
+#   added by liuzheng ************************************************************************
+        #   label_arr=[area, area_center_v, area_center_h ,top,left,bottom,right]
         depth_img, label_arr = self.imghandle.getimage(Predict=True)
         image_shape = np.array(np.shape(depth_img)[0:2])
         depth_img3 = np.array([depth_img, depth_img, depth_img],dtype=np.float32)
@@ -179,6 +181,8 @@ class YOLO(object):
                                                     
             if results[0] is None: 
                 print('No hand found !!!')
+                cv2.imshow('depth image',depth_img255)  
+                cv2.waitKey(0)
                 return None
 
             top_label   = np.array(results[0][:, 6], dtype = 'int32')
@@ -187,7 +191,7 @@ class YOLO(object):
         #---------------------------------------------------------#
         #   设置字体与边框厚度
         #---------------------------------------------------------#
-        font        = ImageFont.truetype(font='model_data/simhei.ttf', size=np.floor(3e-2 * depth_img255.shape[1] + 0.5).astype('int32'))
+        font        = ImageFont.truetype(font='/homeL/zheng/ros_python/handtele/src/handdetection/scripts/yolov7_tiny_pytorch/model_data/simhei.ttf', size=np.floor(3e-2 * depth_img255.shape[1] + 0.5).astype('int32'))
         thickness   = int(max((depth_img255.shape[0] + depth_img255.shape[1]) // np.mean(self.input_shape), 1))
         #---------------------------------------------------------#
         #   计数
@@ -267,8 +271,89 @@ class YOLO(object):
 
         cv2.imshow('depth image',depth_img255)  
         cv2.waitKey(0)
+        self.savecnt += 1
+        # filename = '/homeL/zheng/ros_python/handtele/src/handdetection/scripts/yolov7-tiny-pytorch/saveimg/' + str(self.savecnt).rjust(6,'0')+'.png'
+        # cv2.imwrite(filename,depth_img255)
 #       ------------------
         return [top_boxes, top_conf]
+    
+
+    #---------------------------------------------------#
+    #   检测图片
+    #---------------------------------------------------#
+    def run_realtime(self, image, crop = False, count = False):
+        #---------------------------------------------------#
+        #   modified from detect_image(), just for launch
+        #   img 416*416
+        #---------------------------------------------------#
+
+
+#   added by liuzheng ************************************************************************
+        #   416*416,depth image(e.g. 2000 mm)
+        # depth_img, label_arr = self.imghandle.getimage(Predict=True)
+        # image_shape = np.array(np.shape(depth_img)[0:2])
+        depth_img = image
+        image_shape = np.array([416,416])
+        depth_img3 = np.array([depth_img, depth_img, depth_img],dtype=np.float32)
+        # image = Image.fromarray(depth_img3, 'RGB')
+        image = Image.fromarray(np.transpose((255.0 * depth_img3/np.max(depth_img3)),(1,2,0)),'RGB')
+        # torch.unsqueeze(torch.Tensor(depth_img3),0)
+        image_data = np.expand_dims(depth_img3,0)
+
+#   --------------------
+
+        with torch.no_grad():
+            images = torch.from_numpy(image_data)
+            if self.cuda:
+                images = images.cuda()
+            #---------------------------------------------------------#
+            #   将图像输入网络当中进行预测！
+            #---------------------------------------------------------#
+            outputs = self.net(images)
+            outputs = self.bbox_util.decode_box(outputs)
+            #---------------------------------------------------------#
+            #   将预测框进行堆叠，然后进行非极大抑制
+            #---------------------------------------------------------#
+            results = self.bbox_util.non_max_suppression(torch.cat(outputs, 1), self.num_classes, self.input_shape, 
+                        image_shape, self.letterbox_image, conf_thres = self.confidence, nms_thres = self.nms_iou)
+                                                    
+            if results[0] is None: 
+                print('No hand found !!!')
+                return None
+
+            top_label   = np.array(results[0][:, 6], dtype = 'int32')
+            top_conf    = results[0][:, 4] * results[0][:, 5]
+            top_boxes   = results[0][:, :4]
+
+
+        if False:
+            #---------------------------------------------------------#
+            #   图像绘制
+            #---------------------------------------------------------#
+            depth_img255 = (depth_img / np.max(depth_img) * 255).astype('uint8')
+            
+    #       add by liuzheng
+            resultsclip = np.array(results[0],dtype=np.float32)
+            resultsclip = np.clip(resultsclip,0,depth_img255.shape[0]-1)
+            for i in range(resultsclip.shape[0]):
+                cv2.rectangle(depth_img255,(resultsclip[i][1],resultsclip[i][0]),(resultsclip[i][3],resultsclip[i][2]),(1, 0, 128),thickness=1)
+
+
+            
+            
+            # print('predict boxes (1. left top point to image top edge, left top point to image left edge, right botton point to image top, right botton point to image left edge. 2....):')
+            print('*-*- predict results' , top_boxes, '*--*')
+            print('*-*- cooresponding confidence ',top_conf, '*--*')
+            print('------------------ end -------------------------')
+
+            cv2.imshow('depth image',depth_img255)  
+            cv2.waitKey(0)
+            # self.savecnt += 1
+            # filename = '/homeL/zheng/ros_python/handtele/src/handdetection/scripts/yolov7-tiny-pytorch/saveimg/' + str(self.savecnt).rjust(6,'0')+'.png'
+            # cv2.imwrite(filename,depth_img255)
+#       ------------------
+        return [top_boxes, top_conf]
+    
 
     def get_FPS(self, image, test_interval):
         image_shape = np.array(np.shape(image)[0:2])
